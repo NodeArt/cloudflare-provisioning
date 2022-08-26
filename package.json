@@ -1,0 +1,20 @@
+{
+  "name": "@nodeart/cloudflare-provisioning",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "standard",
+    "prepare": "husky install"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "husky": "^8.0.1",
+    "standard": "^17.0.0"
+  },
+  "dependencies": {
+    "undici": "^5.6.1",
+    "xmlbuilder": "^15.1.1"
+  }
+}
