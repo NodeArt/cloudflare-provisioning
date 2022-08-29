@@ -19,7 +19,8 @@ const cloudflareSettingsHandlers = {
   '0-RTT': CloudFlare.prototype.set0RTT,
   argoSmartRouting: CloudFlare.prototype.setArgoSmartRouting,
   workers: CloudFlare.prototype.rewriteWorkerRoutes,
-  pageRules: CloudFlare.prototype.rewritePageRules
+  pageRules: CloudFlare.prototype.rewritePageRules,
+  hotlinkProtection: CloudFlare.prototype.setHotlinkProtection
 }
 
 function substituteDomainName (settings, domainName) {

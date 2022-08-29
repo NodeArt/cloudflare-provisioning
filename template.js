@@ -124,5 +124,8 @@ module.exports = {
   },
   traffic: {
     argoSmartRouting: 'on'
+  },
+  scrapeShield: {
+    hotlinkProtection: 'off'
   }
 }

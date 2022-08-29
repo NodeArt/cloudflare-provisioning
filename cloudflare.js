@@ -598,6 +598,27 @@ class CloudFlare {
 
     await this.createWorkerRoutes(workerRoutes)
   }
+
+  async setHotlinkProtection (value) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/hotlink_protection`
+
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ value })
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not change hotlink protection: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
 }
 
 module.exports = CloudFlare
