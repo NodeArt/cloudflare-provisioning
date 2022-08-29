@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "test": "standard",
     "lint": "standard",
     "prepare": "husky install"
   },
