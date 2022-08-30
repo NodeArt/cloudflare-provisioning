@@ -190,6 +190,26 @@ class CloudFlare {
     return response
   }
 
+  async getFirewallRules () {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
+
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
   async createFirewallRule (firewallRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
 
@@ -211,15 +231,43 @@ class CloudFlare {
     return response
   }
 
-  async createFirewallRules (firewallRules) {
-    const results = await Promise.allSettled(firewallRules.map(firewallRule => this.createFirewallRule(firewallRule)))
+  async updateFirewallRule (id, firewallRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules/${id}`
 
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i]
-      const firewallRule = firewallRules[i]
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(firewallRule)
+    })
 
-      if (result.status === 'rejected') {
-        console.log(`Could not create firewallRule route for domain ${this.domain} ${JSON.stringify(firewallRule)}: ${result.reason}\n`)
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not update a firewall rule: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async rewriteFirewallRules (firewallRules) {
+    const currentFirewallRules = await this.getFirewallRules()
+
+    for (const firewallRule of firewallRules) {
+      const currentFirewallRule = currentFirewallRules.result.find(
+        rule => rule.description === firewallRule.description
+      )
+
+      try {
+        if (currentFirewallRule) {
+          await this.updateFirewallRule(currentFirewallRule.id, firewallRule)
+        } else {
+          await this.createFirewallRule(firewallRule)
+        }
+      } catch (error) {
+        console.error(`Could not update firewall rule for domain ${this.domain}: ${JSON.stringify(firewallRule)}, error: ${error}`)
       }
     }
   }
