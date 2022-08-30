@@ -56,7 +56,7 @@ module.exports = {
     },
     dataExportCache: {
       targets: [{ target: 'url', constraint: { operator: 'matches', value: 'https://www.$DOMAIN/export/*' } }],
-      actions: [{ id: 'cache_level', value: 'bypass' }],
+      actions: [{ id: 'cache_level', value: 'bypass' }, { id: 'origin_error_page_pass_thru', value: 'on' }],
       status: 'active'
     },
     rootForward: {
