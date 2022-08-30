@@ -52,7 +52,7 @@ async function applyCloudflareSettings (config) {
       ? { email: accountEmail, apiKey: accountKey }
       : { token: site.token }
 
-    const cloudFlare = new CloudFlare(zoneId, options)
+    const cloudFlare = new CloudFlare(zoneId, site.domain, options)
     const domainSettings = substituteDomainName(settings, site.domain)
 
     for (const [key, value] of Object.entries(domainSettings)) {

@@ -5,8 +5,9 @@ const { request } = require('undici')
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4/'
 
 class CloudFlare {
-  constructor (zoneId, options) {
+  constructor (zoneId, domain, options) {
     this.zoneId = zoneId
+    this.domain = domain
 
     this.authorizationHeaders = null
     if (options.email !== undefined && options.apiKey !== undefined) {
@@ -218,7 +219,7 @@ class CloudFlare {
       const firewallRule = firewallRules[i]
 
       if (result.status === 'rejected') {
-        console.log(`Could not create firewallRule route ${JSON.stringify(firewallRule)}: ${result.reason}\n`)
+        console.log(`Could not create firewallRule route for domain ${this.domain} ${JSON.stringify(firewallRule)}: ${result.reason}\n`)
       }
     }
   }
@@ -476,7 +477,7 @@ class CloudFlare {
           await this.createPageRule(pageRule)
         }
       } catch (error) {
-        console.log(`Could not update or create page rule: ${error.message}\n`)
+        console.log(`Could not update or create page rule for domain ${this.domain}: ${error.message}\n`)
       }
     }
   }
@@ -530,7 +531,7 @@ class CloudFlare {
       const workerRoute = workerRoutes[i]
 
       if (result.status === 'rejected') {
-        console.log(`Could not create worker route ${JSON.stringify(workerRoute)}: ${result.reason}\n`)
+        console.log(`Could not create worker route for domain ${this.domain} ${JSON.stringify(workerRoute)}: ${result.reason}\n`)
       }
     }
   }
@@ -583,7 +584,7 @@ class CloudFlare {
       const routeId = routeIds[i]
 
       if (result.status === 'rejected') {
-        console.log(`Could not delete worker route ${routeId}: ${result.reason}\n`)
+        console.log(`Could not delete worker route for domain ${this.domain} ${routeId}: ${result.reason}\n`)
       }
     }
   }
