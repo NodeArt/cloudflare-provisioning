@@ -12,28 +12,6 @@ module.exports = {
           expression: '(cf.client.bot and not http.request.uri.path contains ".well-known")'
         }
       }
-    ],
-    bypassCMSApi: [
-      {
-        description: 'bypass cms api with proxy',
-        action: 'bypass',
-        products: ['uaBlock', 'bic', 'securityLevel'],
-        filter: {
-          enabled: true,
-          expression: '(http.request.uri.path contains "/api/cms/pages" and http.user_agent eq "sitemap-generator-ss") or (http.request.uri.path eq "/api/info/locales" and http.user_agent eq "sitemap-generator-ss")'
-        }
-      }
-    ],
-    allowHotlinkFromKingtraf: [
-      {
-        description: 'allow hotlink from kingtraf',
-        action: 'bypass',
-        products: ['hot'],
-        filter: {
-          enabled: true,
-          expression: '(http.referer contains "kingtraf.com")'
-        }
-      }
     ]
   },
   speedOptimization: {
@@ -44,30 +22,6 @@ module.exports = {
     prefetchURLs: 'on'
   },
   workers: {
-    sitemapCurasao: {
-      pattern: '*$DOMAIN/sitemap.xml*',
-      script: 'sitemap-curasao'
-    },
-    sitemapMalta: {
-      pattern: '*$DOMAIN/sitemap.xml*',
-      script: 'sitemap-malta'
-    },
-    sitemapAustralia: {
-      pattern: '*$DOMAIN/sitemap.xml*',
-      script: 'sitemap-xml-au'
-    },
-    robotsCurasao: {
-      pattern: '*$DOMAIN/robots.txt*',
-      script: 'kingbillycasinocom-robotstxt'
-    },
-    robotsMalta: {
-      pattern: '*$DOMAIN/robots.txt*',
-      script: 'kingbillycom-robotstxt'
-    },
-    robotsAustralia: {
-      pattern: '*$DOMAIN/robots.txt*',
-      script: 'robots_block_seo'
-    },
     disableApi: {
       pattern: '*$DOMAIN/api/*',
       script: null
@@ -126,6 +80,6 @@ module.exports = {
     argoSmartRouting: 'on'
   },
   scrapeShield: {
-    hotlinkProtection: 'off'
+    hotlinkProtection: 'on'
   }
 }
