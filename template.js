@@ -66,7 +66,7 @@ module.exports = {
     },
     ia: {
       targets: [{ target: 'url', constraint: { operator: 'matches', value: '*ia.$DOMAIN/*' } }],
-      actions: [{ id: 'disable_security' }, { id: 'cache_level', value: 'bypass' }],
+      actions: [{ id: 'disable_security' }, { id: 'cache_level', value: 'bypass' }, { id: 'ssl', value: 'flexible' }],
       status: 'active'
     }
   },
