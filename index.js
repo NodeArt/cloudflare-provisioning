@@ -9,7 +9,7 @@ const cloudflareSettingsHandlers = {
   emailObfuscation: CloudFlare.prototype.setEmailObfuscation,
   brotli: CloudFlare.prototype.setBrotli,
   dnsRecords: CloudFlare.prototype.rewriteDNSRecords,
-  firewallRules: CloudFlare.prototype.createFirewallRules,
+  firewallRules: CloudFlare.prototype.rewriteFirewallRules,
   polish: CloudFlare.prototype.setPolish,
   minify: CloudFlare.prototype.setMinify,
   http2Prioritization: CloudFlare.prototype.setHTTP2Prioritization,
