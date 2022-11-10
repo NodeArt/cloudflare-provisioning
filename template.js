@@ -60,7 +60,7 @@ module.exports = {
       status: 'active'
     },
     rootForward: {
-      targets: [{ target: 'url', constraint: { operator: 'matches', value: 'https://$DOMAIN/*' } }],
+      targets: [{ target: 'url', constraint: { operator: 'matches', value: '$DOMAIN/*' } }],
       actions: [{ id: 'forwarding_url', value: { status_code: 301, url: 'https://www.$DOMAIN/$1' } }],
       status: 'active'
     },
