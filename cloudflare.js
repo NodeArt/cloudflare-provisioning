@@ -285,6 +285,127 @@ class CloudFlare {
     }
   }
 
+  async getRedirectRules() {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_dynamic_redirect/entrypoint`
+
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const response = await body.json();
+
+    if (statusCode === 404) {
+      // Create http_request_dynamic_redirect ruleset if one doesn't exist
+      console.log('Ruleset was not found. Initializing redirect ruleset creation...');
+      const createRulesetUrl = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets`;
+      const payload = {
+        name: 'Redirect rules ruleset',
+        kind: 'zone',
+        phase: 'http_request_dynamic_redirect',
+        rules: []
+      };
+
+      const { statusCode: createStatusCode, body: createBody } = await request(createRulesetUrl, {
+        method: 'POST',
+        headers: {
+          ...this.authorizationHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const createResponse = await createBody.json();
+
+      if (createStatusCode !== 200) {
+        throw new Error(`Could not create redirect ruleset: ${statusCode}, error: ${JSON.stringify(createResponse)}`)
+      }
+
+      const { id, rules } = createResponse;
+      if (!id) {
+        throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+      }
+
+      return { id, rules: rules ?? [] };
+    } else {
+      if (statusCode !== 200) {
+        throw new Error(`Could not get redirect rules: ${statusCode}, error: ${JSON.stringify(response)}`)
+      }
+
+      const { id, rules } = response;
+      if (!id) {
+        throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+      }
+
+      return { id, rules: rules ?? [] };
+    }
+  }
+
+  async createRedirectRule(rulesetId, redirectRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(redirectRule)
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not create a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async updateRedirectRule(rulesetId, ruleId, redirectRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`;
+
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(redirectRule)
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not update a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async rewriteRedirectRules(redirectRules) {
+    const { id: rulesetId, rules: currentRedirectRules } = await this.getRedirectRules()
+
+    for (const redirectRule of redirectRules) {
+      const currentRedirectRule = currentRedirectRules.result.find(
+        rule => rule.description === redirectRule.description
+      )
+
+      try {
+        if (currentRedirectRules) {
+          await this.updateRedirectRule(rulesetId, currentRedirectRule.id, redirectRule)
+        } else {
+          await this.createRedirectRule(rulesetId, redirectRule)
+        }
+      } catch (error) {
+        console.error(`Could not update redirect rule for domain ${this.domain}: ${JSON.stringify(redirectRule)}, error: ${error}`)
+      }
+    }
+  }
+
   async setPolish (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/polish`
 
