@@ -1,6 +1,6 @@
 {
   "name": "@nodeart/cloudflare-provisioning",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -15,6 +15,6 @@
     "standard": "^17.0.0"
   },
   "dependencies": {
-    "undici": "^5.10.0"
+    "undici": "^7.3.0"
   }
 }
