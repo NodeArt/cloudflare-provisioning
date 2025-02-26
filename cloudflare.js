@@ -270,7 +270,7 @@ class CloudFlare {
     const { id: rulesetId, rules: currentFirewallRules } = await this.getFirewallRules()
 
     for (const firewallRule of firewallRules) {
-      const currentFirewallRule = currentFirewallRules.result.find(
+      const currentFirewallRule = currentFirewallRules.find(
         rule => rule.description === firewallRule.description
       )
 
@@ -391,7 +391,7 @@ class CloudFlare {
     const { id: rulesetId, rules: currentRedirectRules } = await this.getRedirectRules()
 
     for (const redirectRule of redirectRules) {
-      const currentRedirectRule = currentRedirectRules.result.find(
+      const currentRedirectRule = currentRedirectRules.find(
         rule => rule.description === redirectRule.description
       )
 
