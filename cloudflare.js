@@ -396,7 +396,7 @@ class CloudFlare {
       )
 
       try {
-        if (currentRedirectRules) {
+        if (currentRedirectRule) {
           await this.updateRedirectRule(rulesetId, currentRedirectRule.id, redirectRule)
         } else {
           await this.createRedirectRule(rulesetId, redirectRule)
