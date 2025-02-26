@@ -1,6 +1,7 @@
 'use strict'
 
-const { request } = require('undici')
+const fs = require('node:fs/promises');
+const { request } = require('undici');
 
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4/'
 
@@ -801,6 +802,87 @@ class CloudFlare {
     }
 
     return response
+  }
+
+  async uploadTlsClientAuth({ client_key, client_cert, ca_cert }) {
+    try {
+      await fs.access(client_key, fs.constants.R_OK);
+      await fs.access(client_cert, fs.constants.R_OK);
+      await fs.access(ca_cert, fs.constants.R_OK);
+    } catch (e) {
+      throw new Error(`Cannot access file: ${e?.message}`)
+    }
+
+    const clientKeyContents = await fs.readFile(client_key, 'utf8');
+    const clientCertContents = await fs.readFile(client_cert, 'utf8');
+    const caCertContents = await fs.readFile(ca_cert, 'utf8');
+
+    await this.uploadCertAndKey(clientCertContents, clientKeyContents);
+    await this.uploadCaCert(caCertContents);
+    await this.enableTLSClientAuth();
+  }
+
+  async uploadCertAndKey(clientCert, clientKey) {
+    const url = CLOUDFLARE_API_URL +  `zones/${this.zoneId}/origin_tls_client_auth`;
+    const payload = {
+      certificate: clientCert,
+      private_key: clientKey
+    };
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
+  }
+
+  async uploadCaCert(caCert) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store`;
+    const payload = {
+      certificate: caCert
+    };
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not upload CA certificate: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
+  }
+
+  async enableTLSClientAuth() {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/tls_client_auth`;
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ value: 'on' })
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not enable TSL Client Auth setting: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
   }
 }
 

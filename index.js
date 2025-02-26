@@ -21,7 +21,8 @@ const cloudflareSettingsHandlers = {
   argoSmartRouting: CloudFlare.prototype.setArgoSmartRouting,
   workers: CloudFlare.prototype.rewriteWorkerRoutes,
   pageRules: CloudFlare.prototype.rewritePageRules,
-  hotlinkProtection: CloudFlare.prototype.setHotlinkProtection
+  hotlinkProtection: CloudFlare.prototype.setHotlinkProtection,
+  tlsClientAuth: CloudFlare.prototype.uploadTlsClientAuth
 }
 
 function substituteDomainName (settings, domainName) {
