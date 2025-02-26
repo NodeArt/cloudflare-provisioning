@@ -1,6 +1,7 @@
 'use strict'
 
-const { request } = require('undici')
+const fs = require('node:fs/promises');
+const { request } = require('undici');
 
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4/'
 
@@ -191,7 +192,7 @@ class CloudFlare {
   }
 
   async getFirewallRules () {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_firewall_custom/entrypoint`
 
     const { statusCode, body } = await request(url, {
       method: 'GET',
@@ -201,17 +202,26 @@ class CloudFlare {
       }
     })
 
-    const response = await body.json()
+    const response = await body.json();
 
     if (statusCode !== 200) {
       throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
-    return response
+    const { id, rules } = response;
+    if (!id) {
+      throw new Error(`Could not get firewall rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+    }
+
+    return { id, rules };
   }
 
-  async createFirewallRule (firewallRule) {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
+  async createFirewallRule (rulesetId, firewallRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
+    // Spread "filter" property from deprecated rule API
+    const filter = firewallRule?.filter ?? {};
+    const rule = { ...firewallRule, ...filter };
+    delete rule['filter'];
 
     const { statusCode, body } = await request(url, {
       method: 'POST',
@@ -219,7 +229,7 @@ class CloudFlare {
         ...this.authorizationHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify([firewallRule])
+      body: JSON.stringify(rule)
     })
 
     const response = await body.json()
@@ -231,8 +241,12 @@ class CloudFlare {
     return response
   }
 
-  async updateFirewallRule (id, firewallRule) {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules/${id}`
+  async updateFirewallRule (rulesetId, ruleId, firewallRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`;
+    // Spread "filter" property from deprecated rule API
+    const filter = firewallRule?.filter ?? {};
+    const rule = { ...firewallRule, ...filter };
+    delete rule['filter'];
 
     const { statusCode, body } = await request(url, {
       method: 'PATCH',
@@ -240,7 +254,7 @@ class CloudFlare {
         ...this.authorizationHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(firewallRule)
+      body: JSON.stringify(rule)
     })
 
     const response = await body.json()
@@ -253,21 +267,142 @@ class CloudFlare {
   }
 
   async rewriteFirewallRules (firewallRules) {
-    const currentFirewallRules = await this.getFirewallRules()
+    const { id: rulesetId, rules: currentFirewallRules } = await this.getFirewallRules()
 
     for (const firewallRule of firewallRules) {
-      const currentFirewallRule = currentFirewallRules.result.find(
+      const currentFirewallRule = currentFirewallRules.find(
         rule => rule.description === firewallRule.description
       )
 
       try {
         if (currentFirewallRule) {
-          await this.updateFirewallRule(currentFirewallRule.id, firewallRule)
+          await this.updateFirewallRule(rulesetId, currentFirewallRule.id, firewallRule)
         } else {
-          await this.createFirewallRule(firewallRule)
+          await this.createFirewallRule(rulesetId, firewallRule)
         }
       } catch (error) {
         console.error(`Could not update firewall rule for domain ${this.domain}: ${JSON.stringify(firewallRule)}, error: ${error}`)
+      }
+    }
+  }
+
+  async getRedirectRules() {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_dynamic_redirect/entrypoint`
+
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const response = await body.json();
+
+    if (statusCode === 404) {
+      // Create http_request_dynamic_redirect ruleset if one doesn't exist
+      console.log('Ruleset was not found. Initializing redirect ruleset creation...');
+      const createRulesetUrl = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets`;
+      const payload = {
+        name: 'Redirect rules ruleset',
+        kind: 'zone',
+        phase: 'http_request_dynamic_redirect',
+        rules: []
+      };
+
+      const { statusCode: createStatusCode, body: createBody } = await request(createRulesetUrl, {
+        method: 'POST',
+        headers: {
+          ...this.authorizationHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const createResponse = await createBody.json();
+
+      if (createStatusCode !== 200) {
+        throw new Error(`Could not create redirect ruleset: ${statusCode}, error: ${JSON.stringify(createResponse)}`)
+      }
+
+      const { id, rules } = createResponse;
+      if (!id) {
+        throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+      }
+
+      return { id, rules: rules ?? [] };
+    } else {
+      if (statusCode !== 200) {
+        throw new Error(`Could not get redirect rules: ${statusCode}, error: ${JSON.stringify(response)}`)
+      }
+
+      const { id, rules } = response;
+      if (!id) {
+        throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+      }
+
+      return { id, rules: rules ?? [] };
+    }
+  }
+
+  async createRedirectRule(rulesetId, redirectRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(redirectRule)
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not create a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async updateRedirectRule(rulesetId, ruleId, redirectRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`;
+
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(redirectRule)
+    })
+
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not update a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async rewriteRedirectRules(redirectRules) {
+    const { id: rulesetId, rules: currentRedirectRules } = await this.getRedirectRules()
+
+    for (const redirectRule of redirectRules) {
+      const currentRedirectRule = currentRedirectRules.find(
+        rule => rule.description === redirectRule.description
+      )
+
+      try {
+        if (currentRedirectRule) {
+          await this.updateRedirectRule(rulesetId, currentRedirectRule.id, redirectRule)
+        } else {
+          await this.createRedirectRule(rulesetId, redirectRule)
+        }
+      } catch (error) {
+        console.error(`Could not update redirect rule for domain ${this.domain}: ${JSON.stringify(redirectRule)}, error: ${error}`)
       }
     }
   }
@@ -667,6 +802,87 @@ class CloudFlare {
     }
 
     return response
+  }
+
+  async uploadTlsClientAuth({ client_key, client_cert, ca_cert }) {
+    try {
+      await fs.access(client_key, fs.constants.R_OK);
+      await fs.access(client_cert, fs.constants.R_OK);
+      await fs.access(ca_cert, fs.constants.R_OK);
+    } catch (e) {
+      throw new Error(`Cannot access file: ${e?.message}`)
+    }
+
+    const clientKeyContents = await fs.readFile(client_key, 'utf8');
+    const clientCertContents = await fs.readFile(client_cert, 'utf8');
+    const caCertContents = await fs.readFile(ca_cert, 'utf8');
+
+    await this.uploadCertAndKey(clientCertContents, clientKeyContents);
+    await this.uploadCaCert(caCertContents);
+    await this.enableTLSClientAuth();
+  }
+
+  async uploadCertAndKey(clientCert, clientKey) {
+    const url = CLOUDFLARE_API_URL +  `zones/${this.zoneId}/origin_tls_client_auth`;
+    const payload = {
+      certificate: clientCert,
+      private_key: clientKey
+    };
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
+  }
+
+  async uploadCaCert(caCert) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store`;
+    const payload = {
+      certificate: caCert
+    };
+
+    const { statusCode, body } = await request(url, {
+      method: 'POST',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not upload CA certificate: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
+  }
+
+  async enableTLSClientAuth() {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/tls_client_auth`;
+    const { statusCode, body } = await request(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ value: 'on' })
+    });
+
+    const response = await body.json();
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not enable TSL Client Auth setting: ${statusCode}, error: ${JSON.stringify(response)}`);
+    }
   }
 }
 

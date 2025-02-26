@@ -10,6 +10,7 @@ const cloudflareSettingsHandlers = {
   brotli: CloudFlare.prototype.setBrotli,
   dnsRecords: CloudFlare.prototype.rewriteDNSRecords,
   firewallRules: CloudFlare.prototype.rewriteFirewallRules,
+  redirectRules: CloudFlare.prototype.rewriteRedirectRules,
   polish: CloudFlare.prototype.setPolish,
   minify: CloudFlare.prototype.setMinify,
   http2Prioritization: CloudFlare.prototype.setHTTP2Prioritization,
@@ -20,7 +21,8 @@ const cloudflareSettingsHandlers = {
   argoSmartRouting: CloudFlare.prototype.setArgoSmartRouting,
   workers: CloudFlare.prototype.rewriteWorkerRoutes,
   pageRules: CloudFlare.prototype.rewritePageRules,
-  hotlinkProtection: CloudFlare.prototype.setHotlinkProtection
+  hotlinkProtection: CloudFlare.prototype.setHotlinkProtection,
+  tlsClientAuth: CloudFlare.prototype.uploadTlsClientAuth
 }
 
 function substituteDomainName (settings, domainName) {
