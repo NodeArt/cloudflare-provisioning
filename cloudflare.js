@@ -191,7 +191,7 @@ class CloudFlare {
   }
 
   async getFirewallRules () {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_firewall_custom/entrypoint`
 
     const { statusCode, body } = await request(url, {
       method: 'GET',
@@ -201,17 +201,26 @@ class CloudFlare {
       }
     })
 
-    const response = await body.json()
+    const response = await body.json();
 
     if (statusCode !== 200) {
       throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
-    return response
+    const { id, rules } = response;
+    if (!id) {
+      throw new Error(`Could not get firewall rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
+    }
+
+    return { id, rules };
   }
 
-  async createFirewallRule (firewallRule) {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules`
+  async createFirewallRule (rulesetId, firewallRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
+    // Spread "filter" property from deprecated rule API
+    const filter = firewallRule?.filter ?? {};
+    const rule = { ...firewallRule, ...filter };
+    delete rule['filter'];
 
     const { statusCode, body } = await request(url, {
       method: 'POST',
@@ -219,7 +228,7 @@ class CloudFlare {
         ...this.authorizationHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify([firewallRule])
+      body: JSON.stringify(rule)
     })
 
     const response = await body.json()
@@ -231,8 +240,12 @@ class CloudFlare {
     return response
   }
 
-  async updateFirewallRule (id, firewallRule) {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/firewall/rules/${id}`
+  async updateFirewallRule (rulesetId, ruleId, firewallRule) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`;
+    // Spread "filter" property from deprecated rule API
+    const filter = firewallRule?.filter ?? {};
+    const rule = { ...firewallRule, ...filter };
+    delete rule['filter'];
 
     const { statusCode, body } = await request(url, {
       method: 'PATCH',
@@ -240,7 +253,7 @@ class CloudFlare {
         ...this.authorizationHeaders,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(firewallRule)
+      body: JSON.stringify(rule)
     })
 
     const response = await body.json()
@@ -253,7 +266,7 @@ class CloudFlare {
   }
 
   async rewriteFirewallRules (firewallRules) {
-    const currentFirewallRules = await this.getFirewallRules()
+    const { id: rulesetId, rules: currentFirewallRules } = await this.getFirewallRules()
 
     for (const firewallRule of firewallRules) {
       const currentFirewallRule = currentFirewallRules.result.find(
@@ -262,9 +275,9 @@ class CloudFlare {
 
       try {
         if (currentFirewallRule) {
-          await this.updateFirewallRule(currentFirewallRule.id, firewallRule)
+          await this.updateFirewallRule(rulesetId, currentFirewallRule.id, firewallRule)
         } else {
-          await this.createFirewallRule(firewallRule)
+          await this.createFirewallRule(rulesetId, firewallRule)
         }
       } catch (error) {
         console.error(`Could not update firewall rule for domain ${this.domain}: ${JSON.stringify(firewallRule)}, error: ${error}`)
