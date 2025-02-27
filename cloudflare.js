@@ -810,7 +810,7 @@ class CloudFlare {
       await fs.access(clientCert, fs.constants.R_OK)
       await fs.access(caCert, fs.constants.R_OK)
     } catch (e) {
-      throw new Error(`Cannot access file: ${e?.message}`)
+      throw new Error(`Cancelling cert upload for domain ${this.domain}. Cannot access file: ${e?.message}`)
     }
 
     const clientKeyContents = await fs.readFile(clientKey, 'utf8')
