@@ -208,7 +208,7 @@ class CloudFlare {
       throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
-    const { id, rules } = response
+    const { id, rules } = response?.result ?? {}
     if (!id) {
       throw new Error(`Could not get firewall rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
     }
@@ -325,7 +325,7 @@ class CloudFlare {
         throw new Error(`Could not create redirect ruleset: ${statusCode}, error: ${JSON.stringify(createResponse)}`)
       }
 
-      const { id, rules } = createResponse
+      const { id, rules } = createResponse?.result ?? {}
       if (!id) {
         throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
       }
@@ -336,7 +336,7 @@ class CloudFlare {
         throw new Error(`Could not get redirect rules: ${statusCode}, error: ${JSON.stringify(response)}`)
       }
 
-      const { id, rules } = response
+      const { id, rules } = response?.result ?? {}
       if (!id) {
         throw new Error(`Could not get redirect rules ruleset ID: got ${id}, received value: ${JSON.stringify(response)}`)
       }
@@ -810,7 +810,7 @@ class CloudFlare {
       await fs.access(clientCert, fs.constants.R_OK)
       await fs.access(caCert, fs.constants.R_OK)
     } catch (e) {
-      throw new Error(`Cannot access file: ${e?.message}`)
+      throw new Error(`Cancelling cert upload for domain ${this.domain}. Cannot access file: ${e?.message}`)
     }
 
     const clientKeyContents = await fs.readFile(clientKey, 'utf8')
@@ -825,8 +825,8 @@ class CloudFlare {
   async uploadCertAndKey (clientCert, clientKey) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/origin_tls_client_auth`
     const payload = {
-      certificate: clientCert,
-      private_key: clientKey
+      certificate: clientCert.replace(/\r?\n/g, '\n'),
+      private_key: clientKey.replace(/\r?\n/g, '\n')
     }
 
     const { statusCode, body } = await request(url, {
@@ -840,15 +840,20 @@ class CloudFlare {
 
     const response = await body.json()
 
-    if (statusCode !== 200) {
-      throw new Error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`)
+    if (statusCode !== 200 && statusCode !== 201) {
+      const errors = response?.errors ?? []
+      if (errors.find((error) => error.code === 1406 && error.message === 'This certificate already exists for this zone.')) {
+        console.log(`This certificate already exists for domain ${this.domain}. Continuing...`)
+      } else {
+        throw new Error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`)
+      }
     }
   }
 
   async uploadCaCert (caCert) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store`
     const payload = {
-      certificate: caCert
+      certificate: caCert.replace(/\r?\n/g, '\n')
     }
 
     const { statusCode, body } = await request(url, {
@@ -862,8 +867,13 @@ class CloudFlare {
 
     const response = await body.json()
 
-    if (statusCode !== 200) {
-      throw new Error(`Could not upload CA certificate: ${statusCode}, error: ${JSON.stringify(response)}`)
+    if (statusCode !== 200 && statusCode !== 201) {
+      const errors = response?.errors ?? []
+      if (errors.find((error) => error.code === 1406 && error.message === 'This certificate already exists for this zone.')) {
+        console.log(`This CA certificate already exists for domain ${this.domain}. Continuing...`)
+      } else {
+        throw new Error(`Could not upload CA certificate: ${statusCode}, error: ${JSON.stringify(response)}`)
+      }
     }
   }
 
