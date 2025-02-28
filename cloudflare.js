@@ -832,7 +832,6 @@ class CloudFlare {
     const clientCertIds = await this.getClientCerts()
     const caCertIds = await this.getCaCerts()
 
-    console.log(clientCertIds, caCertIds)
     for (const cert of clientCertIds) {
       try {
         await this.deleteClientCert(cert)
