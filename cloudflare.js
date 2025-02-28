@@ -804,22 +804,118 @@ class CloudFlare {
     return response
   }
 
-  async uploadTlsClientAuth ({ clientKey, clientCert, caCert }) {
-    try {
-      await fs.access(clientKey, fs.constants.R_OK)
-      await fs.access(clientCert, fs.constants.R_OK)
-      await fs.access(caCert, fs.constants.R_OK)
-    } catch (e) {
-      throw new Error(`Cancelling cert upload for domain ${this.domain}. Cannot access file: ${e?.message}`)
+  async uploadTlsClientAuth ({ clientKey, clientCert, caCert, clear }) {
+    if (clear) {
+      await this.clearCustomCerts()
     }
 
-    const clientKeyContents = await fs.readFile(clientKey, 'utf8')
-    const clientCertContents = await fs.readFile(clientCert, 'utf8')
-    const caCertContents = await fs.readFile(caCert, 'utf8')
+    if (clientKey && clientCert && caCert) {
+      try {
+        await fs.access(clientKey, fs.constants.R_OK)
+        await fs.access(clientCert, fs.constants.R_OK)
+        await fs.access(caCert, fs.constants.R_OK)
+      } catch (e) {
+        throw new Error(`Cancelling cert upload for domain ${this.domain}. Cannot access file: ${e?.message}`)
+      }
 
-    await this.uploadCertAndKey(clientCertContents, clientKeyContents)
-    await this.uploadCaCert(caCertContents)
-    await this.enableTLSClientAuth()
+      const clientKeyContents = await fs.readFile(clientKey, 'utf8')
+      const clientCertContents = await fs.readFile(clientCert, 'utf8')
+      const caCertContents = await fs.readFile(caCert, 'utf8')
+
+      await this.uploadCertAndKey(clientCertContents, clientKeyContents)
+      await this.uploadCaCert(caCertContents)
+      await this.enableTLSClientAuth()
+    }
+  }
+
+  async clearCustomCerts () {
+    const clientCertIds = await this.getClientCerts()
+    const caCertIds = await this.getCaCerts()
+
+    console.log(clientCertIds, caCertIds)
+    for (const cert of clientCertIds) {
+      try {
+        await this.deleteClientCert(cert)
+      } catch (e) {
+        console.error(`Failed to delete Client cert: ${e?.message}`)
+      }
+    }
+
+    for (const cert of caCertIds) {
+      try {
+        await this.deleteCaCert(cert)
+      } catch (e) {
+        console.error(`Failed to delete Client cert: ${e?.message}`)
+      }
+    }
+  }
+
+  async getClientCerts () {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/origin_tls_client_auth`
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not get client certificate IDs: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response?.result?.map((cert) => cert?.id) ?? []
+  }
+
+  async getCaCerts () {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store`
+    const { statusCode, body } = await request(url, {
+      method: 'GET',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not get CA certificate IDs: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response?.result?.map((cert) => cert?.id) ?? []
+  }
+
+  async deleteClientCert (certId) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/origin_tls_client_auth/${certId}`
+    const { statusCode, body } = await request(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not delete client certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+  }
+
+  async deleteCaCert (certId) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store/${certId}`
+    const { statusCode, body } = await request(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      }
+    })
+    const response = await body.json()
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not delete CA certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
   }
 
   async uploadCertAndKey (clientCert, clientKey) {
