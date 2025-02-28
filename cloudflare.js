@@ -829,8 +829,12 @@ class CloudFlare {
   }
 
   async clearCustomCerts () {
+    console.log('Initiating certificate clear...')
     const clientCertIds = await this.getClientCerts()
     const caCertIds = await this.getCaCerts()
+
+    console.log(`Client certificates found: ${clientCertIds?.join(', ')}`)
+    console.log(`CA certificates found: ${caCertIds?.join(', ')}`)
 
     for (const cert of clientCertIds) {
       try {
@@ -899,6 +903,8 @@ class CloudFlare {
     if (statusCode !== 200) {
       throw new Error(`Could not delete client certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
+
+    console.log(`Deleted client certificate ID ${certId}`)
   }
 
   async deleteCaCert (certId) {
@@ -915,6 +921,8 @@ class CloudFlare {
     if (statusCode !== 200) {
       throw new Error(`Could not delete CA certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
+
+    console.log(`Deleted CA certificate ID ${certId}`)
   }
 
   async uploadCertAndKey (clientCert, clientKey) {
