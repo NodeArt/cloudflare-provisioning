@@ -202,7 +202,12 @@ class CloudFlare {
       }
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode !== 200) {
       throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
@@ -232,7 +237,12 @@ class CloudFlare {
       body: JSON.stringify(rule)
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode !== 200) {
       throw new Error(`Could not create a firewall rule: ${statusCode}, error: ${JSON.stringify(response)}`)
@@ -257,7 +267,12 @@ class CloudFlare {
       body: JSON.stringify(rule)
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode !== 200) {
       throw new Error(`Could not update a firewall rule: ${statusCode}, error: ${JSON.stringify(response)}`)
@@ -297,7 +312,12 @@ class CloudFlare {
       }
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode === 404) {
       // Create http_request_dynamic_redirect ruleset if one doesn't exist
@@ -357,7 +377,12 @@ class CloudFlare {
       body: JSON.stringify(redirectRule)
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode !== 200) {
       throw new Error(`Could not create a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
@@ -378,7 +403,12 @@ class CloudFlare {
       body: JSON.stringify(redirectRule)
     })
 
-    const response = await body.json()
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
 
     if (statusCode !== 200) {
       throw new Error(`Could not update a redirect rule: ${statusCode}, error: ${JSON.stringify(response)}`)
@@ -829,18 +859,18 @@ class CloudFlare {
   }
 
   async clearCustomCerts () {
-    console.log('Initiating certificate clear...')
+    console.log(`Initiating certificate clear for domain ${this.domain}...`, new Date().toISOString())
     const clientCertIds = await this.getClientCerts()
     const caCertIds = await this.getCaCerts()
 
-    console.log(`Client certificates found: ${clientCertIds?.join(', ')}`)
-    console.log(`CA certificates found: ${caCertIds?.join(', ')}`)
+    console.log(`Client certificates found for domain ${this.domain}: ${clientCertIds?.join(', ')}`, new Date().toISOString())
+    console.log(`CA certificates found for domain ${this.domain}: ${caCertIds?.join(', ')}`, new Date().toISOString())
 
     for (const cert of clientCertIds) {
       try {
         await this.deleteClientCert(cert)
       } catch (e) {
-        console.error(`Failed to delete Client cert: ${e?.message}`)
+        console.error(`Failed to delete Client cert for domain ${this.domain}: ${e?.message}`, new Date().toISOString())
       }
     }
 
@@ -848,7 +878,7 @@ class CloudFlare {
       try {
         await this.deleteCaCert(cert)
       } catch (e) {
-        console.error(`Failed to delete Client cert: ${e?.message}`)
+        console.error(`Failed to delete Client cert for domain ${this.domain}: ${e?.message}`, new Date().toISOString())
       }
     }
   }
@@ -865,7 +895,8 @@ class CloudFlare {
     const response = await body.json()
 
     if (statusCode !== 200) {
-      throw new Error(`Could not get client certificate IDs: ${statusCode}, error: ${JSON.stringify(response)}`)
+      console.error(`Could not get client certificate IDs for domain ${this.domain}: ${statusCode}, error: ${JSON.stringify(response)}`, new Date().toISOString())
+      throw new Error(`Could not get client certificate IDs for domain ${this.domain}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
     return response?.result?.map((cert) => cert?.id) ?? []
@@ -883,7 +914,8 @@ class CloudFlare {
     const response = await body.json()
 
     if (statusCode !== 200) {
-      throw new Error(`Could not get CA certificate IDs: ${statusCode}, error: ${JSON.stringify(response)}`)
+      console.error(`Could not get CA certificate IDs for domain ${this.domain}: ${statusCode}, error: ${JSON.stringify(response)}`, new Date().toISOString())
+      throw new Error(`Could not get CA certificate IDs for domain ${this.domain}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
     return response?.result?.map((cert) => cert?.id) ?? []
@@ -904,7 +936,7 @@ class CloudFlare {
       throw new Error(`Could not delete client certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
-    console.log(`Deleted client certificate ID ${certId}`)
+    console.log(`Deleted client certificate ID ${certId} for ${this.domain}`, new Date().toISOString())
   }
 
   async deleteCaCert (certId) {
@@ -919,10 +951,11 @@ class CloudFlare {
     const response = await body.json()
 
     if (statusCode !== 200) {
+      console.error(`Could not delete CA certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`, new Date().toISOString())
       throw new Error(`Could not delete CA certificate ID ${certId}: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
-    console.log(`Deleted CA certificate ID ${certId}`)
+    console.log(`Deleted CA certificate ID ${certId} for ${this.domain}`, new Date().toISOString())
   }
 
   async uploadCertAndKey (clientCert, clientKey) {
@@ -946,11 +979,14 @@ class CloudFlare {
     if (statusCode !== 200 && statusCode !== 201) {
       const errors = response?.errors ?? []
       if (errors.find((error) => error.code === 1406 && error.message === 'This certificate already exists for this zone.')) {
-        console.log(`This certificate already exists for domain ${this.domain}. Continuing...`)
+        console.log(`This certificate already exists for domain ${this.domain}. Continuing...`, new Date().toISOString())
       } else {
+        console.error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`, new Date().toISOString())
         throw new Error(`Could not upload certificate and private key: ${statusCode}, error: ${JSON.stringify(response)}`)
       }
     }
+
+    console.log(`Client certificate uploaded for domain ${this.domain}, cert id: ${response?.result?.id}`, new Date().toISOString())
   }
 
   async uploadCaCert (caCert) {
@@ -978,6 +1014,8 @@ class CloudFlare {
         throw new Error(`Could not upload CA certificate: ${statusCode}, error: ${JSON.stringify(response)}`)
       }
     }
+
+    console.log(`CA certificate uploaded for domain ${this.domain}, cert id: ${response?.result?.id}`, new Date().toISOString())
   }
 
   async enableTLSClientAuth () {
@@ -996,6 +1034,8 @@ class CloudFlare {
     if (statusCode !== 200) {
       throw new Error(`Could not enable TSL Client Auth setting: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
+
+    console.log(`Enabled TSL Client Auth setting for domain ${this.domain}`, new Date().toISOString())
   }
 }
 
