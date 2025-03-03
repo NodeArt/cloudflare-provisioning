@@ -878,7 +878,7 @@ class CloudFlare {
       try {
         await this.deleteCaCert(cert)
       } catch (e) {
-        console.error(`Failed to delete Client cert for domain ${this.domain}: ${e?.message}`, new Date().toISOString())
+        console.error(`Failed to delete CA cert for domain ${this.domain}: ${e?.message}`, new Date().toISOString())
       }
     }
   }
