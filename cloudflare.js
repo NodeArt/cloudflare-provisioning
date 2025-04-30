@@ -284,8 +284,13 @@ class CloudFlare {
   async rewriteFirewallRules (firewallRules) {
     const { id: rulesetId, rules: currentFirewallRules } = await this.getFirewallRules()
 
+    if (!rulesetId) {
+      console.error(`Could not update firewall rules for domain ${this.domain}: custom firewall ruleset id is not found`)
+      throw new Error('Custom firewall ruleset id is not found')
+    }
+
     for (const firewallRule of firewallRules) {
-      const currentFirewallRule = currentFirewallRules.find(
+      const currentFirewallRule = currentFirewallRules?.find(
         rule => rule.description === firewallRule.description
       )
 
@@ -420,8 +425,13 @@ class CloudFlare {
   async rewriteRedirectRules (redirectRules) {
     const { id: rulesetId, rules: currentRedirectRules } = await this.getRedirectRules()
 
+    if (!rulesetId) {
+      console.error(`Could not update redirect rules for domain ${this.domain}: custom firewall ruleset id is not found`)
+      throw new Error('Custom redirect ruleset id is not found')
+    }
+
     for (const redirectRule of redirectRules) {
-      const currentRedirectRule = currentRedirectRules.find(
+      const currentRedirectRule = currentRedirectRules?.find(
         rule => rule.description === redirectRule.description
       )
 
