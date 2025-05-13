@@ -51,14 +51,10 @@ async function applyCloudflareSettings (config) {
       throw new Error('Cloudflare zone ID is not defined')
     }
 
-    let options
-    if (site.token) {
-      options = { token: site.token }
-    } else if (accountToken) {
-      options = { token: accountToken }
-    } else {
-      options = { email: accountEmail, apiKey: accountKey }
-    }
+    const options =
+      (site.token && { token: site.token }) ||
+      (accountToken && { token: accountToken }) ||
+      { email: accountEmail, apiKey: accountKey }
 
     const cloudFlare = new CloudFlare(zoneId, site.domain, options)
     const domainSettings = substituteDomainName(settings, site.domain)
