@@ -36,6 +36,7 @@ async function applyCloudflareSettings (config) {
 
   const accountEmail = process.env.CLOUDFLARE_EMAIL
   const accountKey = process.env.CLOUDFLARE_API_KEY
+  const accountToken = process.env.CLOUDFLARE_TOKEN
 
   if (config.enabled === false) {
     console.log('Config is disabled and would not be applied:', config.domains)
@@ -50,9 +51,14 @@ async function applyCloudflareSettings (config) {
       throw new Error('Cloudflare zone ID is not defined')
     }
 
-    const options = site.token === undefined
-      ? { email: accountEmail, apiKey: accountKey }
-      : { token: site.token }
+    let options
+    if (site.token) {
+      options = { token: site.token }
+    } else if (accountToken) {
+      options = { token: accountToken }
+    } else {
+      options = { email: accountEmail, apiKey: accountKey }
+    }
 
     const cloudFlare = new CloudFlare(zoneId, site.domain, options)
     const domainSettings = substituteDomainName(settings, site.domain)
