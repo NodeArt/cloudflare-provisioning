@@ -6,9 +6,10 @@ const { request } = require('undici')
 const CLOUDFLARE_API_URL = 'https://api.cloudflare.com/client/v4/'
 
 class CloudFlare {
-  constructor (zoneId, domain, options) {
+  constructor (zoneId, domain, options, requestDelay = 0) {
     this.zoneId = zoneId
     this.domain = domain
+    this.requestDelay = requestDelay
 
     this.authorizationHeaders = null
     if (options.email !== undefined && options.apiKey !== undefined) {
@@ -28,7 +29,7 @@ class CloudFlare {
   async setIPv6 (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/ipv6`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -49,7 +50,7 @@ class CloudFlare {
   async setEmailObfuscation (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/email_obfuscation`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -70,7 +71,7 @@ class CloudFlare {
   async setSSL (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/ssl`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -91,7 +92,7 @@ class CloudFlare {
   async setBrotli (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/brotli`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -112,7 +113,7 @@ class CloudFlare {
   async getDNSRecords () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -152,7 +153,7 @@ class CloudFlare {
   async createDNSRecord (dnsRecord) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -173,7 +174,7 @@ class CloudFlare {
   async updateDNSRecord (id, dnsRecord) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records/${id}`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -194,7 +195,7 @@ class CloudFlare {
   async getFirewallRules () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_firewall_custom/entrypoint`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -228,7 +229,7 @@ class CloudFlare {
     const rule = { ...firewallRule, ...filter }
     delete rule.filter
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -258,7 +259,7 @@ class CloudFlare {
     const rule = { ...firewallRule, ...filter }
     delete rule.filter
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -309,7 +310,7 @@ class CloudFlare {
   async getRedirectRules () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/phases/http_request_dynamic_redirect/entrypoint`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -335,7 +336,7 @@ class CloudFlare {
         rules: []
       }
 
-      const { statusCode: createStatusCode, body: createBody } = await request(createRulesetUrl, {
+      const { statusCode: createStatusCode, body: createBody } = await this.requestWithDelay(createRulesetUrl, {
         method: 'POST',
         headers: {
           ...this.authorizationHeaders,
@@ -373,7 +374,7 @@ class CloudFlare {
   async createRedirectRule (rulesetId, redirectRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -399,7 +400,7 @@ class CloudFlare {
   async updateRedirectRule (rulesetId, ruleId, redirectRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -450,7 +451,7 @@ class CloudFlare {
   async setPolish (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/polish`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -471,7 +472,7 @@ class CloudFlare {
   async setMinify (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/minify`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -492,7 +493,7 @@ class CloudFlare {
   async setHTTP2Prioritization (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/h2_prioritization`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -513,7 +514,7 @@ class CloudFlare {
   async setPrefetchURLs (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/prefetch_preload`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -534,7 +535,7 @@ class CloudFlare {
   async setHttp2 (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/http2`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -555,7 +556,7 @@ class CloudFlare {
   async setHttp3 (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/http3`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -576,7 +577,7 @@ class CloudFlare {
   async set0RTT (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/0rtt`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -597,7 +598,7 @@ class CloudFlare {
   async setArgoSmartRouting (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/argo/smart_routing`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -618,7 +619,7 @@ class CloudFlare {
   async getPageRules () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/pagerules`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -638,7 +639,7 @@ class CloudFlare {
   async updatePageRule (pageRuleId, pageRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/pagerules/${pageRuleId}`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PUT',
       headers: {
         ...this.authorizationHeaders,
@@ -659,7 +660,7 @@ class CloudFlare {
   async createPageRule (pageRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/pagerules`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -708,7 +709,7 @@ class CloudFlare {
   async getAvailablePageRules () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/pagerules/settings`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -728,7 +729,7 @@ class CloudFlare {
   async createWorkerRoute (workerRoute) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/workers/routes`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -762,7 +763,7 @@ class CloudFlare {
   async getWorkerRoutes () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/workers/routes`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -782,7 +783,7 @@ class CloudFlare {
   async deleteWorkerRoute (routeId) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/workers/routes/${routeId}`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'DELETE',
       headers: {
         ...this.authorizationHeaders,
@@ -826,7 +827,7 @@ class CloudFlare {
   async setHotlinkProtection (value) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/hotlink_protection`
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -895,7 +896,7 @@ class CloudFlare {
 
   async getClientCerts () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/origin_tls_client_auth`
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -914,7 +915,7 @@ class CloudFlare {
 
   async getCaCerts () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store`
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'GET',
       headers: {
         ...this.authorizationHeaders,
@@ -933,7 +934,7 @@ class CloudFlare {
 
   async deleteClientCert (certId) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/origin_tls_client_auth/${certId}`
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'DELETE',
       headers: {
         ...this.authorizationHeaders,
@@ -951,7 +952,7 @@ class CloudFlare {
 
   async deleteCaCert (certId) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/acm/custom_trust_store/${certId}`
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'DELETE',
       headers: {
         ...this.authorizationHeaders,
@@ -975,7 +976,7 @@ class CloudFlare {
       private_key: clientKey.replace(/\r?\n/g, '\n')
     }
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -1005,7 +1006,7 @@ class CloudFlare {
       certificate: caCert.replace(/\r?\n/g, '\n')
     }
 
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
       headers: {
         ...this.authorizationHeaders,
@@ -1030,7 +1031,7 @@ class CloudFlare {
 
   async enableTLSClientAuth () {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/tls_client_auth`
-    const { statusCode, body } = await request(url, {
+    const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
@@ -1047,6 +1048,16 @@ class CloudFlare {
 
     console.log(`Enabled TSL Client Auth setting for domain ${this.domain}`, new Date().toISOString())
   }
+
+  async requestWithDelay (url, options) {
+    const response = await request(url, options)
+    await delay(this.requestDelay)
+    return response
+  }
+}
+
+function delay (delayMs) {
+  return new Promise(resolve => setTimeout(resolve, delayMs))
 }
 
 module.exports = CloudFlare
