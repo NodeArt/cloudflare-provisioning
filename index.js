@@ -37,6 +37,7 @@ async function applyCloudflareSettings (config) {
   const accountEmail = process.env.CLOUDFLARE_EMAIL
   const accountKey = process.env.CLOUDFLARE_API_KEY
   const accountToken = process.env.CLOUDFLARE_TOKEN
+  const requestDelayMs = isNaN(parseInt(process.env.DELAY_MS, 10)) ? 500 : parseInt(process.env.DELAY_MS, 10)
 
   if (config.enabled === false) {
     console.log('Config is disabled and would not be applied:', config.domains)
@@ -56,7 +57,7 @@ async function applyCloudflareSettings (config) {
       (accountToken && { token: accountToken }) ||
       { email: accountEmail, apiKey: accountKey }
 
-    const cloudFlare = new CloudFlare(zoneId, site.domain, options)
+    const cloudFlare = new CloudFlare(zoneId, site.domain, options, requestDelayMs)
     const domainSettings = substituteDomainName(settings, site.domain)
 
     for (const [key, value] of Object.entries(domainSettings)) {
