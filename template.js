@@ -23,7 +23,7 @@ module.exports = {
   },
   workers: {
     disableApi: {
-      pattern: '*$DOMAIN/api/*',
+      pattern: 'www.$DOMAIN/api/*',
       script: null
     },
     rootDomainCookies: {
