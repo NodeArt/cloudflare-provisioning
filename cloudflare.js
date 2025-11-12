@@ -210,7 +210,43 @@ class CloudFlare {
       response = await body.text()
     }
 
-    if (statusCode !== 200) {
+    if (statusCode === 404) {
+      console.log('Firewall ruleset was not found. Initializing firewall ruleset creation...')
+      const createRulesetUrl = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets`
+      const payload = {
+        name: 'Custom firewall ruleset',
+        kind: 'zone',
+        phase: 'http_request_firewall_custom',
+        rules: []
+      }
+
+      const { statusCode: createStatusCode, body: createBody } = await this.requestWithDelay(createRulesetUrl, {
+        method: 'POST',
+        headers: {
+          ...this.authorizationHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      let createResponse
+      try {
+        createResponse = await createBody.json()
+      } catch (e) {
+        createResponse = await createBody.text()
+      }
+
+      if (createStatusCode !== 200) {
+        throw new Error(`Could not create firewall ruleset: ${createStatusCode}, error: ${JSON.stringify(createResponse)}`)
+      }
+
+      const { id, rules } = createResponse?.result ?? {}
+      if (!id) {
+        throw new Error(`Could not get firewall rules ruleset ID: got ${id}, received value: ${JSON.stringify(createResponse)}`)
+      }
+
+      return { id, rules: rules ?? [] }
+    } else if (statusCode !== 200) {
       throw new Error(`Could not get firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
