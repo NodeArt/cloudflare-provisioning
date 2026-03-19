@@ -7,10 +7,8 @@ module.exports = {
       {
         description: 'block bots',
         action: 'block',
-        filter: {
-          enabled: true,
-          expression: '(cf.client.bot and not http.request.uri.path contains ".well-known")'
-        }
+        enabled: true,
+        expression: '(cf.client.bot and not http.request.uri.path contains ".well-known")'
       }
     ]
   },
