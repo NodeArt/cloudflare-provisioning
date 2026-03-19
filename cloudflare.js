@@ -460,27 +460,33 @@ class CloudFlare {
   }
 
   async rewriteRedirectRules (redirectRules) {
-    const { id: rulesetId, rules: currentRedirectRules } = await this.getRedirectRules()
+    const { id: rulesetId } = await this.getRedirectRules()
 
     if (!rulesetId) {
       console.error(`Could not update redirect rules for domain ${this.domain}: custom firewall ruleset id is not found`)
       throw new Error('Custom redirect ruleset id is not found')
     }
 
-    for (const redirectRule of redirectRules) {
-      const currentRedirectRule = currentRedirectRules?.find(
-        rule => rule.description === redirectRule.description
-      )
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}`
 
-      try {
-        if (currentRedirectRule) {
-          await this.updateRedirectRule(rulesetId, currentRedirectRule.id, redirectRule)
-        } else {
-          await this.createRedirectRule(rulesetId, redirectRule)
-        }
-      } catch (error) {
-        console.error(`Could not update redirect rule for domain ${this.domain}: ${JSON.stringify(redirectRule)}, error: ${error}`)
-      }
+    const { statusCode, body } = await this.requestWithDelay(url, {
+      method: 'PUT',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ rules: redirectRules })
+    })
+
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not update redirect rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
   }
 
@@ -583,6 +589,9 @@ class CloudFlare {
     const response = await body.json()
 
     if (statusCode !== 200) {
+      if (response && response.errors && response.errors.find(e => e.code === 1015)) {
+        return response
+      }
       throw new Error(`Could not set HTTP2: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
