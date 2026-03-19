@@ -319,27 +319,33 @@ class CloudFlare {
   }
 
   async rewriteFirewallRules (firewallRules) {
-    const { id: rulesetId, rules: currentFirewallRules } = await this.getFirewallRules()
+    const { id: rulesetId } = await this.getFirewallRules()
 
     if (!rulesetId) {
       console.error(`Could not update firewall rules for domain ${this.domain}: custom firewall ruleset id is not found`)
       throw new Error('Custom firewall ruleset id is not found')
     }
 
-    for (const firewallRule of firewallRules) {
-      const currentFirewallRule = currentFirewallRules?.find(
-        rule => rule.description === firewallRule.description
-      )
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}`
 
-      try {
-        if (currentFirewallRule) {
-          await this.updateFirewallRule(rulesetId, currentFirewallRule.id, firewallRule)
-        } else {
-          await this.createFirewallRule(rulesetId, firewallRule)
-        }
-      } catch (error) {
-        console.error(`Could not update firewall rule for domain ${this.domain}: ${JSON.stringify(firewallRule)}, error: ${error}`)
-      }
+    const { statusCode, body } = await this.requestWithDelay(url, {
+      method: 'PUT',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ rules: firewallRules })
+    })
+
+    let response
+    try {
+      response = await body.json()
+    } catch (e) {
+      response = await body.text()
+    }
+
+    if (statusCode !== 200) {
+      throw new Error(`Could not update firewall rules: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
   }
 
@@ -568,6 +574,9 @@ class CloudFlare {
     const response = await body.json()
 
     if (statusCode !== 200) {
+      if (response && response.errors && response.errors.find(e => e.code === 1015)) {
+        return response
+      }
       throw new Error(`Could not set prefetch URLs: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
