@@ -1,21 +1,21 @@
 {
   "name": "@nodeart/cloudflare-provisioning",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "standard",
     "lint": "standard",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "husky": "^8.0.2",
-    "standard": "^17.0.0"
+    "husky": "^9.1.7",
+    "standard": "^17.1.2"
   },
   "dependencies": {
-    "undici": "^7.3.0"
+    "undici": "^8.3.0"
   },
   "publishConfig": {
     "access": "public"
