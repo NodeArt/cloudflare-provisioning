@@ -260,10 +260,7 @@ class CloudFlare {
 
   async createFirewallRule (rulesetId, firewallRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules`
-    // Spread "filter" property from deprecated rule API
-    const filter = firewallRule?.filter ?? {}
-    const rule = { ...firewallRule, ...filter }
-    delete rule.filter
+    const rule = { ...firewallRule }
 
     const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'POST',
@@ -290,10 +287,7 @@ class CloudFlare {
 
   async updateFirewallRule (rulesetId, ruleId, firewallRule) {
     const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/rulesets/${rulesetId}/rules/${ruleId}`
-    // Spread "filter" property from deprecated rule API
-    const filter = firewallRule?.filter ?? {}
-    const rule = { ...firewallRule, ...filter }
-    delete rule.filter
+    const rule = { ...firewallRule }
 
     const { statusCode, body } = await this.requestWithDelay(url, {
       method: 'PATCH',
