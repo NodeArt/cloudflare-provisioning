@@ -110,43 +110,218 @@ class CloudFlare {
     return response
   }
 
-  async getDNSRecords () {
-    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records`
+  async parseResponseBody (body) {
+    const raw = await body.text()
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return raw
+    }
+  }
+
+  async setZoneSetting (settingId, value, label = settingId) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/settings/${settingId}`
 
     const { statusCode, body } = await this.requestWithDelay(url, {
-      method: 'GET',
+      method: 'PATCH',
       headers: {
         ...this.authorizationHeaders,
         'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ value })
+    })
+
+    const response = await this.parseResponseBody(body)
+
+    if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
+      throw new Error(`Could not set ${label}: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async setAlwaysUseHttps (value) {
+    return this.setZoneSetting('always_use_https', value, 'always_use_https')
+  }
+
+  async setBrowserCacheTtl (value) {
+    return this.setZoneSetting('browser_cache_ttl', value, 'browser_cache_ttl')
+  }
+
+  async setIpGeolocation (value) {
+    return this.setZoneSetting('ip_geolocation', value, 'ip_geolocation')
+  }
+
+  async setMinTlsVersion (value) {
+    return this.setZoneSetting('min_tls_version', value, 'min_tls_version')
+  }
+
+  async setSecurityHeader (value) {
+    return this.setZoneSetting('security_header', value, 'security_header')
+  }
+
+  async setTls13 (value) {
+    return this.setZoneSetting('tls_1_3', value, 'tls_1_3')
+  }
+
+  async setWebsockets (value) {
+    return this.setZoneSetting('websockets', value, 'websockets')
+  }
+
+  async setManagedHeaders (value) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/managed_headers`
+
+    const { statusCode, body } = await this.requestWithDelay(url, {
+      method: 'PATCH',
+      headers: {
+        ...this.authorizationHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(value)
+    })
+
+    const response = await this.parseResponseBody(body)
+
+    if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
+      throw new Error(`Could not set managed headers: ${statusCode}, error: ${JSON.stringify(response)}`)
+    }
+
+    return response
+  }
+
+  async getDNSRecords () {
+    const records = []
+    let page = 1
+    let totalPages = 1
+    let lastResponse = { success: true, result: [] }
+
+    while (page <= totalPages) {
+      const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records?per_page=100&page=${page}`
+
+      const { statusCode, body } = await this.requestWithDelay(url, {
+        method: 'GET',
+        headers: {
+          ...this.authorizationHeaders
+        }
+      })
+
+      const response = await this.parseResponseBody(body)
+
+      if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
+        throw new Error(`Could not get DNS records: ${statusCode}, error: ${JSON.stringify(response)}`)
+      }
+
+      lastResponse = response
+      if (Array.isArray(response.result)) {
+        records.push(...response.result)
+      }
+
+      totalPages = response.result_info?.total_pages ?? 1
+      page += 1
+    }
+
+    return { ...lastResponse, result: records }
+  }
+
+  async deleteDNSRecord (id) {
+    const url = CLOUDFLARE_API_URL + `zones/${this.zoneId}/dns_records/${id}`
+
+    const { statusCode, body } = await this.requestWithDelay(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.authorizationHeaders
       }
     })
 
-    const response = await body.json()
+    const response = await this.parseResponseBody(body)
 
-    if (statusCode !== 200) {
-      throw new Error(`Could not get DNS records: ${statusCode}, error: ${JSON.stringify(response)}`)
+    if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
+      throw new Error(`Could not delete DNS record: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
     return response
   }
 
   async rewriteDNSRecords (dnsRecords) {
-    const currentDNSRecords = await this.getDNSRecords()
+    if (!Array.isArray(dnsRecords)) {
+      throw new TypeError('dnsRecords must be an array')
+    }
+    if (dnsRecords.length === 0) {
+      return
+    }
 
-    for (const dnsRecord of dnsRecords) {
-      const currentDNSRecord = currentDNSRecords.result.find(
-        record => record.name === dnsRecord.name
-      )
+    const currentDNSRecords = await this.getDNSRecords()
+    let existingRecords = [...(currentDNSRecords.result ?? [])]
+    const apexDomain = typeof this.domain === 'string'
+      ? this.domain.trim().replace(/\.$/, '').toLowerCase()
+      : ''
+    const usedIds = new Set()
+    const errors = []
+
+    for (let index = 0; index < dnsRecords.length; index += 1) {
+      const rawRecord = dnsRecords[index]
 
       try {
+        const resolvedName = normalizeDNSRecordName(rawRecord.name, this.domain)
+        const desiredName = resolvedName.toLowerCase()
+        const desiredType = rawRecord.type.toUpperCase()
+        const desiredRecord = { ...rawRecord, name: resolvedName }
+
+        const conflicts = existingRecords.filter(existing =>
+          isConflictingDNSRecord(existing, desiredName, desiredType, apexDomain)
+        )
+
+        for (const conflict of conflicts) {
+          await this.deleteDNSRecord(conflict.id)
+          existingRecords = existingRecords.filter(item => item.id !== conflict.id)
+        }
+
+        const candidates = existingRecords.filter(existing =>
+          typeof existing.name === 'string' &&
+          typeof existing.type === 'string' &&
+          existing.name.toLowerCase() === desiredName &&
+          existing.type.toUpperCase() === desiredType &&
+          !usedIds.has(existing.id)
+        )
+
+        const exactMatch = candidates.find(existing => existing.content === desiredRecord.content)
+        const remainingDesired = dnsRecords.slice(index + 1)
+        const unclaimedCandidate = candidates.find(existing =>
+          !remainingDesired.some(other =>
+            typeof other?.name === 'string' &&
+            typeof other?.type === 'string' &&
+            normalizeDNSRecordName(other.name, this.domain).toLowerCase() === desiredName &&
+            other.type.toUpperCase() === desiredType &&
+            other.content === existing.content
+          )
+        )
+
+        const currentDNSRecord =
+          exactMatch ||
+          unclaimedCandidate ||
+          (desiredType === 'CNAME' ? candidates[0] : undefined)
+
         if (currentDNSRecord) {
-          await this.updateDNSRecord(currentDNSRecord.id, dnsRecord)
+          const updated = await this.updateDNSRecord(currentDNSRecord.id, desiredRecord)
+          usedIds.add(currentDNSRecord.id)
+          if (updated?.result) {
+            Object.assign(currentDNSRecord, updated.result)
+          }
         } else {
-          await this.createDNSRecord(dnsRecord)
+          const created = await this.createDNSRecord(desiredRecord)
+          if (created?.result?.id) {
+            existingRecords.push(created.result)
+            usedIds.add(created.result.id)
+          }
         }
       } catch (error) {
-        console.error(`Could not update DNS record: ${JSON.stringify(dnsRecord)}, error: ${error}`)
+        console.error(`Could not update DNS record: ${JSON.stringify(rawRecord)}, error: ${error}`)
+        errors.push(error)
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `Could not update ${errors.length} DNS record(s) for domain ${this.domain}`)
     }
   }
 
@@ -162,9 +337,9 @@ class CloudFlare {
       body: JSON.stringify(dnsRecord)
     })
 
-    const response = await body.json()
+    const response = await this.parseResponseBody(body)
 
-    if (statusCode !== 200) {
+    if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
       throw new Error(`Could not create DNS record: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
@@ -183,9 +358,9 @@ class CloudFlare {
       body: JSON.stringify(dnsRecord)
     })
 
-    const response = await body.json()
+    const response = await this.parseResponseBody(body)
 
-    if (statusCode !== 200) {
+    if (statusCode !== 200 || typeof response !== 'object' || response === null || response.success === false) {
       throw new Error(`Could not update DNS record: ${statusCode}, error: ${JSON.stringify(response)}`)
     }
 
@@ -728,6 +903,7 @@ class CloudFlare {
 
   async rewritePageRules (pageRules) {
     const currentPageRules = await this.getPageRules()
+    const errors = []
 
     for (const pageRule of pageRules) {
       const currentPageRule = currentPageRules.result.find(currentPageRule => {
@@ -749,8 +925,13 @@ class CloudFlare {
           await this.createPageRule(pageRule)
         }
       } catch (error) {
-        console.log(`Could not update or create page rule for domain ${this.domain}: ${error.message}\n`)
+        console.error(`Could not update or create page rule for domain ${this.domain}: ${error.message}\n`)
+        errors.push(error)
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `Could not update ${errors.length} page rule(s) for domain ${this.domain}`)
     }
   }
 
@@ -797,14 +978,20 @@ class CloudFlare {
 
   async createWorkerRoutes (workerRoutes) {
     const results = await Promise.allSettled(workerRoutes.map(workerRoute => this.createWorkerRoute(workerRoute)))
+    const errors = []
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i]
       const workerRoute = workerRoutes[i]
 
       if (result.status === 'rejected') {
-        console.log(`Could not create worker route for domain ${this.domain} ${JSON.stringify(workerRoute)}: ${result.reason}\n`)
+        console.error(`Could not create worker route for domain ${this.domain} ${JSON.stringify(workerRoute)}: ${result.reason}\n`)
+        errors.push(result.reason)
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `Could not create ${errors.length} worker route(s) for domain ${this.domain}`)
     }
   }
 
@@ -850,26 +1037,48 @@ class CloudFlare {
 
   async deleteWorkerRoutes (routeIds) {
     const results = await Promise.allSettled(routeIds.map(routeId => this.deleteWorkerRoute(routeId)))
+    const errors = []
 
     for (let i = 0; i < results.length; i++) {
       const result = results[i]
       const routeId = routeIds[i]
 
       if (result.status === 'rejected') {
-        console.log(`Could not delete worker route for domain ${this.domain} ${routeId}: ${result.reason}\n`)
+        console.error(`Could not delete worker route for domain ${this.domain} ${routeId}: ${result.reason}\n`)
+        errors.push(result.reason)
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `Could not delete ${errors.length} worker route(s) for domain ${this.domain}`)
     }
   }
 
   async rewriteWorkerRoutes (workerRoutes) {
     const currentWorkerRoutes = await this.getWorkerRoutes()
     const currentWorkerRoutesIds = currentWorkerRoutes.result.map(route => route.id)
+    const errors = []
 
     if (currentWorkerRoutesIds.length > 0) {
-      await this.deleteWorkerRoutes(currentWorkerRoutesIds)
+      try {
+        await this.deleteWorkerRoutes(currentWorkerRoutesIds)
+      } catch (error) {
+        errors.push(error)
+      }
     }
 
-    await this.createWorkerRoutes(workerRoutes)
+    try {
+      await this.createWorkerRoutes(workerRoutes)
+    } catch (error) {
+      errors.push(error)
+    }
+
+    if (errors.length === 1) {
+      throw errors[0]
+    }
+    if (errors.length > 1) {
+      throw new AggregateError(errors, `Could not rewrite worker routes for domain ${this.domain}`)
+    }
   }
 
   async setHotlinkProtection (value) {
@@ -1102,6 +1311,54 @@ class CloudFlare {
     await delay(this.requestDelay)
     return response
   }
+}
+
+function normalizeDNSRecordName (name, domain) {
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('DNS record name is required')
+  }
+  const trimmed = name.trim().replace(/\.$/, '')
+  if (!domain) {
+    return trimmed
+  }
+
+  const cleanDomain = String(domain).trim().replace(/\.$/, '')
+  if (trimmed === '@') {
+    return cleanDomain
+  }
+
+  const lowerName = trimmed.toLowerCase()
+  const lowerDomain = cleanDomain.toLowerCase()
+  if (lowerName === lowerDomain || lowerName.endsWith(`.${lowerDomain}`)) {
+    return trimmed
+  }
+
+  return `${trimmed}.${cleanDomain}`
+}
+
+function isConflictingDNSRecord (existing, desiredName, desiredType, apexDomain) {
+  if (typeof existing?.name !== 'string' || typeof existing?.type !== 'string') {
+    return false
+  }
+
+  if (existing.name.toLowerCase() !== desiredName) {
+    return false
+  }
+
+  const existingType = existing.type.toUpperCase()
+  if (desiredType === 'CNAME') {
+    if (desiredName === apexDomain) {
+      return existingType === 'A' || existingType === 'AAAA'
+    }
+
+    return existingType !== 'CNAME'
+  }
+
+  if (desiredType === 'A' || desiredType === 'AAAA') {
+    return existingType === 'CNAME'
+  }
+
+  return desiredName !== apexDomain && existingType === 'CNAME'
 }
 
 function delay (delayMs) {
