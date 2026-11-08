@@ -1,10 +1,10 @@
 {
   "name": "@nodeart/cloudflare-provisioning",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "standard",
+    "test": "standard && node --test",
     "lint": "standard",
     "prepare": "husky"
   },
