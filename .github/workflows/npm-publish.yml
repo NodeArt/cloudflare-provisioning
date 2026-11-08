@@ -37,4 +37,4 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm ci
-      - run: npm publish
+      - run: npm publish --loglevel verbose
