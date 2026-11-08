@@ -243,7 +243,10 @@ class CloudFlare {
   }
 
   async rewriteDNSRecords (dnsRecords) {
-    if (!Array.isArray(dnsRecords) || dnsRecords.length === 0) {
+    if (!Array.isArray(dnsRecords)) {
+      throw new TypeError('dnsRecords must be an array')
+    }
+    if (dnsRecords.length === 0) {
       return
     }
 
@@ -1054,12 +1057,28 @@ class CloudFlare {
   async rewriteWorkerRoutes (workerRoutes) {
     const currentWorkerRoutes = await this.getWorkerRoutes()
     const currentWorkerRoutesIds = currentWorkerRoutes.result.map(route => route.id)
+    const errors = []
 
     if (currentWorkerRoutesIds.length > 0) {
-      await this.deleteWorkerRoutes(currentWorkerRoutesIds)
+      try {
+        await this.deleteWorkerRoutes(currentWorkerRoutesIds)
+      } catch (error) {
+        errors.push(error)
+      }
     }
 
-    await this.createWorkerRoutes(workerRoutes)
+    try {
+      await this.createWorkerRoutes(workerRoutes)
+    } catch (error) {
+      errors.push(error)
+    }
+
+    if (errors.length === 1) {
+      throw errors[0]
+    }
+    if (errors.length > 1) {
+      throw new AggregateError(errors, `Could not rewrite worker routes for domain ${this.domain}`)
+    }
   }
 
   async setHotlinkProtection (value) {
@@ -1295,7 +1314,10 @@ class CloudFlare {
 }
 
 function normalizeDNSRecordName (name, domain) {
-  const trimmed = String(name).trim().replace(/\.$/, '')
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('DNS record name is required')
+  }
+  const trimmed = name.trim().replace(/\.$/, '')
   if (!domain) {
     return trimmed
   }
